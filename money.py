@@ -1,7 +1,9 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-Usage: ./money.py -> run basic tests of random transactions
+! Caution: there is a lot of Bloomfilter packages -> use bloomfilterpy
+Packages: pip3 install bloomfilterpy
+Usage: run ./backend.py in background then run ./money.py -> basic tests of random transactions
 Block = pk:48 + cert:96 + (val:2 + bal:4 + num:4 + dst:8 + date:4 + blf:[14-70] + hash:16) + sign:96 
 """
 import ecc, random, backend
@@ -56,25 +58,25 @@ class agent:
             v, b, s.o.pt = ecc.b2i(m[:2]), ecc.b2i(m[2:6]), s.o.uncompress(s.r.p)
             if i == 0:
                 u, k, f, d, p, c = ecc.b2i(q)+1, b, BloomFilter.loads((l)), ecc.b2i(t), e[:48], e[48:144]
-                assert s.o.verify(c, p) and backend.get8(e[:8]) == ecc.b2i(q)
+                assert s.o.verify(c, p) and backend.getYF(e[:8]) == ecc.b2i(q)
             elif i < n-1:
                 k += v
                 j = '%x'%ecc.b2i(e[:8] + q)
-                if j in f: assert not backend.get20(p[:8] + e[:8] + q)
+                if j in f: assert not backend.getFP(p[:8] + e[:8] + q)
                 f.put(j)
-                backend.add(p[:8] + e)
-                assert backend.get20(p[:8] + e[:8] + q) and j in f and s.o.verify(e[48:144], e[:48])
+                backend.setYF(p[:8] + e)
+                assert backend.getFP(p[:8] + e[:8] + q) and j in f and s.o.verify(e[48:144], e[:48])
             else:
                 s.z += v
                 s.tp.append(e)
-                backend.set(e)
+                backend.setFP(e)
                 assert k-v == b and f.dumps() == l and h == hsh(y[:-BLZ]) and u == ecc.b2i(q) and d < ecc.b2i(t)
             s.o.pt = s.o.uncompress(e[:48])
             assert s.o.verify(e[-96:], e[:-96])
         return True
 
 if __name__ == '__main__':
-    root, NB = agent(), 10
+    root, NB, s, b = agent(), 10, 0, 0
     pop = (alice, bob, carol, dave, eve) = [agent(root) for i in range(5)]
     alice.get_paid(carol.pay(alice, 20))
     alice.get_paid( dave.pay(alice, 20))
@@ -82,7 +84,9 @@ if __name__ == '__main__':
     bob.get_paid(  alice.pay(bob,  100))
     pop += [agent(root) for i in range(NB)]
     for i in range(100):
-        b, s = pop[random.randint(0, NB-1)], pop[random.randint(0, NB-1)]
-        print (i, s.get_paid(b.pay(s, random.randint(1, 50))))
+        while s == b: b, s = random.randint(0, NB-1), random.randint(0, NB-1)
+        val = random.randint(1, 50)
+        print ('#%02d %2d->%2d (%2d$): %s' % (i, b, s, val, pop[s].get_paid(pop[b].pay(pop[s], val))))
+        b, s = 0, 0
     assert sum([x.z for x in pop]) == 0
 # End ⊔net!
